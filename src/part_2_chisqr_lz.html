@@ -369,7 +369,111 @@ summary {
 </div>
 
 
+<div id="overview" class="section level2">
+<h2>Overview</h2>
+<p>In Part 2, we’ll do an introduction to chi-square test for independence in R using lizard tail breakage data recorded at Jornada Basin Long Term Ecological Research site.</p>
+<p><strong>Data from:</strong> Lightfoot, D. 2017. Lizard pitfall trap data (LTER-II, LTER-III) ver 36. Environmental Data Initiative. <a href="https://doi.org/10.6073/pasta/ff37b4cace16a9943575f3fd7067064e" class="uri">https://doi.org/10.6073/pasta/ff37b4cace16a9943575f3fd7067064e</a> (Accessed 2020-07-23).</p>
+<p>The data are in data/lizards.csv of this project.</p>
+</div>
+<div id="step-3.-get-data-take-a-look" class="section level2">
+<h2>Step 3. Get data &amp; take a look</h2>
+<p>Read in the lizards.csv data and take a look (using <code>View(lizards)</code> in the Console) to familiarize yourself with the data structure:</p>
+<pre class="r"><code>lizards &lt;- read_csv(here(&quot;data&quot;, &quot;lizards.csv&quot;))</code></pre>
+<pre><code>## Parsed with column specification:
+## cols(
+##   date = col_character(),
+##   zone = col_character(),
+##   site = col_character(),
+##   plot = col_character(),
+##   pit = col_double(),
+##   spp = col_character(),
+##   sex = col_character(),
+##   rcap = col_character(),
+##   toe_num = col_double(),
+##   SV_length = col_double(),
+##   total_length = col_double(),
+##   weight = col_double(),
+##   tail = col_character(),
+##   pc = col_double()
+## )</code></pre>
+<p>And for fun, let’s find the counts of each lizard species in the data:</p>
+<pre class="r"><code>lizards %&gt;% 
+  count(spp) %&gt;% 
+  arrange(-n) # negative means arrange in decreasing order</code></pre>
+<pre><code>## # A tibble: 22 x 2
+##    spp       n
+##    &lt;chr&gt; &lt;int&gt;
+##  1 UTST   1938
+##  2 NONE   1234
+##  3 CNIN    257
+##  4 CNTI    227
+##  5 CNUN     54
+##  6 COTE     54
+##  7 CNTE     49
+##  8 HOMA     49
+##  9 SCUN     43
+## 10 PHCO     36
+## # ... with 12 more rows</code></pre>
+<p>The most commonly observed lizard here (UTST) is <em>Uta stansburiana</em>, or commonly the side-blotched lizard. We’ll continue by exploring just that lizard.</p>
+</div>
+<div id="make-a-subset" class="section level2">
+<h2>Make a subset</h2>
+<p>Make a subset from <code>lizards</code> that only contains observations for:</p>
+<ul>
+<li>side-blotched lizards (UTST)</li>
+<li>at sites “IBPE” (enclosure grassland site), “RABB” (rabbit mesquite site), and “EAST” (east tarbush site)</li>
+<li>where the tail condition is recorded as either “W” (whole) or “B” (broken)</li>
+</ul>
+<pre class="r"><code>utst &lt;- lizards %&gt;% 
+  filter(spp == &quot;UTST&quot;) %&gt;% 
+  filter(site %in% c(&quot;IBPE&quot;, &quot;RABB&quot;, &quot;EAST&quot;)) %&gt;%
+  filter(tail %in% c(&quot;B&quot;, &quot;W&quot;))</code></pre>
+</div>
+<div id="find-counts-and-proportions-of-lizards-with-broken-or-whole-tails-at-each-site" class="section level2">
+<h2>Find counts and proportions of lizards with broken or whole tails at each site</h2>
+<pre class="r"><code>utst %&gt;% 
+  count(site, tail)</code></pre>
+<pre><code>## # A tibble: 6 x 3
+##   site  tail      n
+##   &lt;chr&gt; &lt;chr&gt; &lt;int&gt;
+## 1 EAST  B        82
+## 2 EAST  W       220
+## 3 IBPE  B        92
+## 4 IBPE  W       236
+## 5 RABB  B        43
+## 6 RABB  W       221</code></pre>
+<p>The <code>janitor::tabyl()</code> function gets this pretty close to contingency table format</p>
+<pre class="r"><code>tail_counts &lt;-utst %&gt;% 
+  janitor::tabyl(site, tail)
 
+tail_proportions &lt;- tail_counts %&gt;% 
+  adorn_percentages() %&gt;% # showing percentage of lizards at each site with broken or whole tails
+  adorn_pct_formatting(digits = 2) %&gt;%  # rounding decimals
+  adorn_ns() #actual counts in each cell as well in parenthesis</code></pre>
+</div>
+<div id="make-contingency-table-and-run-chi-square" class="section level2">
+<h2>Make contingency table and run chi-square</h2>
+<p>First, we see that the site is its own variable - when we run chi-square, we really only want the counts in the table.</p>
+<p>We can use <code>column_to_rownames</code> to convert entries in a column to stored rownames</p>
+<pre class="r"><code>lizard_ct &lt;- tail_counts %&gt;% #pull column information into rownames
+  column_to_rownames(var = &quot;site&quot;) # now we just have two columns and ready to be fed into chi sqrd</code></pre>
+</div>
+<div id="chi-square" class="section level2">
+<h2>Chi-square</h2>
+<p><strong>Now</strong> this is in shape to run chi-square.</p>
+<p>What are we asking? Are site and tail breakage independent? In other words: is there a significant association between site and tail breakage?</p>
+<pre class="r"><code>lizard_x2 &lt;- chisq.test(lizard_ct)
+lizard_x2</code></pre>
+<pre><code>## 
+##  Pearson&#39;s Chi-squared test
+## 
+## data:  lizard_ct
+## X-squared = 13.064, df = 2, p-value = 0.001456</code></pre>
+<pre class="r"><code>lizard_tidy &lt;- broom::tidy(lizard_x2)</code></pre>
+<p>X-square value is an aggregate value indicating how different the values in our table are to what we would expect in null hypothesis scenario that site and tail breakage are not independent. <em>Degrees of freedom are the number of rows minus one time the number of columns minus one</em></p>
+<p>There is a significant association (non-independence) between site and lizard tail breakage (<span class="math inline">\(\chi\)</span><sup>2</sup>(2) = 13.0639448, <em>p</em> = 0.0014561).</p>
+<p>Remember: you’d also want to report the actual counts and proportions in each group!</p>
+</div>
 
 
 
