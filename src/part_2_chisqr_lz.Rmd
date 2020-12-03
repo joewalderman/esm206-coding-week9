@@ -1,0 +1,11 @@
+---
+title: "part_2jw_chisqr_liz"
+author: "Joe Walderman"
+date: "12/3/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+

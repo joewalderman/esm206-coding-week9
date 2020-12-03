@@ -1,0 +1,132 @@
+---
+title: "part1_jw"
+author: "Joe Walderman"
+date: "12/3/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+library(palmerpenguins)
+library(GGally)
+library(stargazer)
+```
+
+## Step 2: Reminder visual data exploration
+
+We always want to view our data in a bunch of different ways (scatterplots, jitterplots, pairs plots) to explore patterns, relationships, etc. *before* analyses & regression. 
+
+Here's just a quick reminder of how to use `GGally::ggpairs()` to create a useful pairs plot (but this should not be the only exploratory viz you'd do in the wild).
+
+
+```{r}
+penguins %>% 
+  ggpairs(aes())
+```
+
+```{r}
+penguins %>% 
+  select(species, bill_length_mm:body_mass_g) %>% 
+  ggpairs(aes(color = species))
+```
+
+
+So there are moderate positive correlations that exist (e.g. the 0.719 between body mass & bill depth for gentoos (only moderately high)), but nothing *really* high - collinearity is not a concern here (though you could explore it with the `car::vif()` function. 
+
+## Comparing regression models
+
+Here, we are going to compare different versions of a regression model with penguin mass as the dependent variable in each. **DISCLAIMER:** If we were doing this in the wild, we'd need to do *a lot* of background research to understand conceptually which variables should be included and why. As we are (probably) not penguin experts, we will pretend we've already done that extensive research and exploration to justify variable selection. 
+
+The 4 model versions we will compare for this exercise are: 
+
+(1) Penguin Mass ~ Flipper Length + Species
+(2) Penguin Mass ~ Flipper Length + Species
+(3) Penguin Mass ~ Flipper Length + Species + Sex + Bill Length
+(4) Penguin Mass ~ Flipper Length + Species + Sex + Bill Length + Island
+
+Create the 4 models in your code as follows (always using penguin mass as the dependent variable, but use different combinations of predictor variables and compare them: 
+
+```{r}
+lm1 <- lm(body_mass_g ~ flipper_length_mm + species, data = penguins)
+
+lm2 <- lm(body_mass_g ~ flipper_length_mm + species + sex, data = penguins)
+
+lm3 <- lm(body_mass_g ~ flipper_length_mm + species + sex + bill_length_mm, data = penguins)
+
+lm4 <- lm(body_mass_g ~ flipper_length_mm + species + sex + bill_length_mm + island, data = penguins)
+```
+Expect an increase in 40.71 grams of body mass for every 1mm increase in flipper length, species in respect to reference level species
+
+Explore the outputs of the different model variations. How does the coefficient of determination (adjusted R^2^) change? How do the coefficient values change?
+
+We should also look at the diagnostics for each. Do you have any second thoughts about the model validity when you explore diagnostic plots for normality of residuals, homoscedasticity and potential outliers?
+
+```{r}
+# plot(lm1) # No concerns
+# plot(lm2) # No concerns
+# plot(lm3) # No concerns
+# plot(lm4) # No concerns
+```
+
+## Compare the model AIC values
+
+In lecture we learned about the Akaike Information Criterion to compare the "quality" of models, as a measure of balance between model fit and complexity (since there is a penalty for added variables). Use the `AIC` function to find the AIC value for each model. Lower AIC indicates better fit: 
+
+```{r}
+AIC(lm1)
+AIC(lm2)
+AIC(lm3)
+AIC(lm4)
+```
+
+Lower AIC for lms 2 and 3 means adding those additional variables was worth the increased complexity
+
+Based on these 4 models only, what model does the Akaike Information Criterion indicate is the best balance between fit & complexity? 
+
+Does that mean we should choose to pick that model based on that alone? No! It is on more piece of information to consider. Context, critical thinking, conceptual understanding of relationships between variables all need to be the major drivers in variable selection. 
+
+## Returning results of multiple models
+
+    "All models are wrong, but some are useful." - George Box
+
+All models are wrong, and sometimes it's hard to know which one is the *best* -- so sometimes, it makes sense to show the results of multiple model permutations and let the audience compare them on their own. 
+
+The `stargazer` package, which we used to make a table of regression results last week, allows you to quickly show results of multiple regression models side-by-side! 
+
+For example, let's say I considered my different models and decided that models 1 and 3 will be included in my final report. I can make a table that includes results from both as follows (remember to include `results = 'asis'` in the code chunk header):
+
+## Use stargazer package for a table with multiple model outputs
+
+```{r, results = 'asis'}
+ # if knitting to html use 'asis' bc stargazer is going to produce html code to create the table, don't want it to be changed after that
+
+stargazer(lm1, lm2, lm3, lm4, type = "html") #include results from multiple models in the same table by listing models you want to include in stargazer
+```
+
+Looking at bill length mm for lm3, means on average expect 1 mm inc in bill length is associated with a 21.633g increase in body mass, with 7.178 (in parenthesis below coef) std error
+
+## Omitted variable bias in action - Simpson's paradox
+
+In lecture, we learned about omitted variable bias. One special case is when the trend is completely reversed due to an erroneously omitted variable. Let's explore that in penguins! 
+
+First, let's make a graph of flipper length versus bill depth, ignoring species:
+
+```{r}
+ggplot(data = penguins, aes(x = flipper_length_mm, y = bill_depth_mm)) +
+  geom_point() +
+  geom_smooth(method = "lm") #using ordinary least squares
+```
+
+Should be skeptical with this bc we know there is potential that species is a really important variable when considering this data.
+
+We can see that the resulting trend, if we ignore other variables, is *negative*. What happens when we *include* species as a variable?
+
+```{r}
+ggplot(data = penguins, aes(x = flipper_length_mm,
+                            y = bill_depth_mm,
+                            group = species)) + #I want these to exist in different groups, where that group is defined by different levels in the species variable. **SUPER IMPORTANT!!!**
+             geom_point(aes(color = species)) +
+  geom_smooth(method = "lm")
+```
+
